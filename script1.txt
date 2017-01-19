@@ -1,0 +1,204 @@
+<?php
+/**
+ * Magento
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE_AFL.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to license@magentocommerce.com so we can send you a copy immediately.
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade Magento to newer
+ * versions in the future. If you wish to customize Magento for your
+ * needs please refer to http://www.magentocommerce.com for more information.
+ *
+ * @category    design
+ * @package     base_default
+ * @copyright   Copyright (c) 2012 Magento Inc. (http://www.magentocommerce.com)
+ * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
+?>
+<?php
+/**
+ * Template for Mage_Page_Block_Html
+ */
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="<?php echo $this->getLang() ?>" lang="<?php echo $this->getLang() ?>">
+    <head>
+        <?php echo $this->getChildHtml('head') ?>
+    </head>
+    <body<?php echo $this->getBodyClass() ? ' class="tk-proxima-nova ' . $this->getBodyClass() . '"' : '' ?>>
+        <?php echo $this->getChildHtml('after_body_start') ?>
+        <div class="page-master">
+            <div class="wrapper">
+                <?php echo $this->getChildHtml('global_notices') ?>
+                <div class="page">
+
+
+
+                    <?php echo $this->getChildHtml('header') ?>
+
+
+                    <span class="category-name">
+                        <?php if (Mage::registry('current_category')): ?>
+                            <div class="heading">
+                                <h1 class="page-mid"><?php echo Mage::registry('current_category')->getName() ?>
+                                
+                                <?php
+                                $catagory_model = Mage::getModel('catalog/category')->load(Mage::registry('current_category')->getId());
+
+                                $collection = Mage::getResourceModel('catalog/product_collection');
+
+                                $collection->addCategoryFilter($catagory_model); //category filter
+
+                                $collection->addAttributeToFilter('status', 1);
+                                $sum = 0;
+                                foreach ($collection as $product):
+                                    $storeId = Mage::app()->getStore()->getId();
+                                    $summaryData = Mage::getModel('review/review_summary')
+                                            ->setStoreId($storeId)
+                                            ->load($product->getId());
+                                    $sum+=$summaryData['reviews_count'];
+                                endforeach;
+                                ?>
+                                <span class="review-count">
+
+                                    <?php // echo '('.$sum.' Reviews)' ?>
+
+                                </span>
+                                </h1> 
+                            </div>
+                        <?php endif; ?>
+                    </span>
+
+                    <div class="main-container col2-left-layout column-subcat-tabs">
+                        <div class="main">
+                            <div class="breadcrumbs">
+                                <?php echo $this->getChildHtml('breadcrumbs') ?>
+                            </div>
+
+                            <?php $_helper = Mage::helper('catalog/category') ?>
+                            <?php $_categories = $_helper->getStoreCategories() ?>
+                            <?php $currentCategory = Mage::registry('current_category');
+                                  $currentCategoryName = $currentCategory->getName();
+                                  $currentCategoryId = $currentCategory->getId();
+                                  $firstLocation = '';
+                                  if($currentCategoryName != 'Poker Chips'){
+                                    $parentid = $currentCategory->getParentId();
+                                    $currentCategory = Mage::getModel('catalog/category')->load($parentid);
+                                  }
+                            ?>
+                            <?php if (count($_categories) > 0): ?>
+                                    <?php foreach ($_categories as $_category): ?>
+                                        <?php if ($currentCategory && $currentCategory->getId() == $_category->getId()): ?>
+                                        <?php $_category = Mage::getModel('catalog/category')->load($_category->getId()) ?>
+                                            <?php $_subcategories = $_category->getChildrenCategories() ?>
+                                            <?php if (count($_subcategories) > 0): ?>
+                                            <ul class="category-links column-cat row">
+                                            <?php foreach ($_subcategories as $_subcategory): 
+                                                $li_class = "tab-li";
+                                                $get_id = $_GET['cat'];
+                                                if($_subcategory->getId() == $get_id){
+                                                    $li_class .= ' active';
+                                                }
+                                                if(strlen($firstLocation) < 1 && $currentCategoryName == 'Poker Chips'){
+                                                    $firstLocation = $_helper->getCategoryUrl($currentCategory)."?cat=".$_subcategory->getId();
+                                                }
+                                            ?>
+                                                    <li class="<?php echo $li_class; ?>">
+                                                        <div class="cat_cat">
+                                                            <h3>
+                                                                <strong>
+                                                                    <a href="<?php echo $_helper->getCategoryUrl($_subcategory); ?>"><?php echo $_subcategory->getName(); ?></a>
+                                                                </strong>
+                                                            </h3>
+                                                        </div>
+                                                    </li>
+                                            <?php endforeach; ?>
+                                            </ul>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+
+                            <div class="category-page cms-blocks">
+                                <div class="col-left sidebar"><?php echo $this->getChildHtml('left') ?></div>
+                                <div class="col-main">
+                                    <?php echo $this->getChildHtml('global_messages') ?>
+                                    <?php echo $this->getChildHtml('content') ?>
+                                </div>
+                            </div>
+
+                            <?php if (Mage::registry('current_category') && (Mage::registry('current_category')->getName() == "Clay Poker Chips" || Mage::registry('current_category')->getName() == "Golf Ball Markers") ): ?>
+                                <div class="cms-blocks">
+                                    <div class="cms-blocks-inner fullRow">
+                                        <?php 
+                                            $_product = Mage::getModel('catalog/product')->load(3789); //getting product object for particular product id
+                                            $this->helper('yotpo')->showWidget($this, $_product); 
+                                        ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php
+                                if (Mage::registry('current_category') && $catagory_model->getDescription()):
+                            ?>
+                                <div class="cms-blocks">
+                                    <div class="category_description row-fluid">
+                                        
+                                        <?php if($catagory_model->getThumbnail()): ?>
+                                            <div class="col-sm-5 image">
+                                                <img src="<?php echo $this->getSkinUrl('images/image_placeholder.jpg'); ?>" data-original="<?php echo Mage::getBaseUrl('media').'catalog/category/'. $catagory_model->getThumbnail(); ?>" class="lazy" width="400" />
+                                            </div>
+                                        <?php endif; ?> 
+                                        
+                                        <div class="col-sm-6 description">
+                                            <?php echo $catagory_model->getDescription(); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php
+                                endif;
+                            ?>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script>
+            //Responsive Filter button 
+            jQuery(window).load(function($){
+                jQuery('<span class="filter-menu-toggle">Filters</span>').insertBefore('.col-left.sidebar').on('click', function(){
+                    jQuery('.col-left.sidebar').slideToggle();
+                });
+            });
+            jQuery(document).ready(function(){
+                <?php if(strlen($firstLocation)>0){ ?>
+                    //window.location = '<?php echo $firstLocation;?>';
+                    jQuery('.tab-li').first().addClass('active');
+                <?php }else{ ?>
+                    var cur_category_class = "<?php echo '.category'.$currentCategoryId; ?>";
+                    var cur_category_name = jQuery(cur_category_class).find('strong').html();
+                    jQuery('.tab-li').each(function(){
+                        var html = jQuery(this).find('a').html();
+                        if(html == cur_category_name){
+                            jQuery(this).addClass('active');
+                        }
+                    })
+                <?php } ?>
+            })
+            </script>
+        </div>
+        <?php echo $this->getChildHtml('footer') ?>
+        <?php echo $this->getAbsoluteFooter() ?>
+        <?php echo $this->getChildHtml('before_body_end') ?>
+    </body>
+</html>

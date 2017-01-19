@@ -1,0 +1,419 @@
+<?php
+
+class OrganicInternet_SimpleConfigurableProducts_Catalog_Block_Product_View_Type_Configurable
+    extends Mage_Catalog_Block_Product_View_Type_Configurable
+{
+    public function getJsonConfig()
+    {
+    	$cache = Mage::getSingleton('core/cache');
+		$option_values = $cache->load('px_scp_configurable_options_'.$this->getProduct()->getId().'_'.$this->getCurrentStore()->getCode());
+		
+		if($option_values == false){
+			
+	        //$config = Zend_Json::decode(parent::getJsonConfig());
+	    	$config = Zend_Json::decode($this->getPixopaJsonConfig());
+	
+	        $childProducts = array();
+	
+	        //Create the extra price and tier price data/html we need.
+	        foreach ($this->getAllowProducts() as $product) {
+	        	$product->setStoreId($this->getCurrentStore()->getStoreId())->load($product->getId());
+	            $productId  = $product->getId();
+	            $finalImageUrl = array();
+	            $finalImageName = array();
+	            $finalBigImageUrl = array();
+
+	            foreach ($product->getMediaGalleryImages() as $image){
+	            	// print_r($image);
+	            	// echo "<br/><br/><br/>";
+                    $url = Mage::helper('catalog/image')->init($product, 'image', $image->getFile())->resize(100, 100);
+                    array_push($finalImageUrl,(string)$url);
+                    $url = Mage::helper('catalog/image')->init($product, 'image', $image->getFile())->resize(840, 840);
+                    array_push($finalBigImageUrl,(string)$url);
+                    $label = $image['label'];
+                    array_push($finalImageName,(string)$label);
+				}
+
+				$template_id = $product->getTemplate();
+
+	            $childProducts[$productId] = array(
+	            	"sprice" => $product->getPrice(),
+	                "price" => $this->_registerJsPrice($this->_convertPrice($product->getPrice())),
+	                "finalPrice" => $this->_registerJsPrice($this->_convertPrice($product->getFinalPrice())),
+	                "finalImageUrl" => $finalImageUrl,
+	                "finalBigImageUrl" => $finalBigImageUrl,
+	                "finalImageName" => $finalImageName,
+	                "finalProductName" => $product->getName(),
+	                "template_id" => $template_id,
+	                "finalColor" => $product->getColor(),
+	                "finalEdgePattern" => $product->getEdgePattern(),
+	                "finalSetSize" => $product->getChipSetSize(),
+	                "finalCaseStyle" => $product->getCaseStyle(),
+	                "finalSetEdgePattern" => $product->getSetEdgePattern(),
+	                "finalSetCaseStyle" => $product->getSetCaseStyle(),
+	                "finalChipColor" => $product->getChipColor(),
+	                "finalChipEdgePattern" => $product->getChipEdgePattern(),
+	                "finalCardStock" => $product->getCardStock(),
+	                "finalCeramicColor" => $product->getCeramicColor(),
+	                "finalCeramicDiameter" => $product->getCeramicDiameter(),
+	                "finalSize" => $product->getSize()
+	            );
+	
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_name')) {
+	                $childProducts[$productId]["productName"] = $product->getName();
+	            }
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_description')) {
+	                $childProducts[$productId]["description"] = $this->helper('catalog/output')->productAttribute($product, $product->getDescription(), 'description');
+	            }
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_short_description')) {
+	                $childProducts[$productId]["shortDescription"] = $this->helper('catalog/output')->productAttribute($product, nl2br($product->getShortDescription()), 'short_description');
+	            }
+	
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_attributes')) {
+	                $childBlock = $this->getLayout()->createBlock('catalog/product_view_attributes');
+	                $childProducts[$productId]["productAttributes"] = $childBlock->setTemplate('catalog/product/view/attributes.phtml')
+	                    ->setProduct($product)
+	                    ->toHtml();
+	            }
+	
+	            #if image changing is enabled..
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_image')) {
+	                #but dont bother if fancy image changing is enabled
+	                if (!Mage::getStoreConfig('SCP_options/product_page/change_image_fancy')) {
+	                    #If image is not placeholder...
+	                    if($product->getImage()!=='no_selection') {
+	                        $childProducts[$productId]["imageUrl"] = (string)Mage::helper('catalog/image')->init($product, 'image');
+	                    }
+	                }
+	            }
+	        }
+	
+	        //Remove any existing option prices.
+	        //Removing holes out of existing arrays is not nice,
+	        //but it keeps the extension's code separate so if Varien's getJsonConfig
+	        //is added to, things should still work.
+	        if (is_array($config['attributes'])) {
+	            foreach ($config['attributes'] as $attributeID => &$info) {
+	                if (is_array($info['options'])) {
+	                    foreach ($info['options'] as &$option) {
+	                        unset($option['price']);
+	                    }
+	                    unset($option); //clear foreach var ref
+	                }
+	            }
+	            unset($info); //clear foreach var ref
+	        }
+	
+	        $p = $this->getProduct();
+	        $config['childProducts'] = $childProducts;
+	        if ($p->getMaxPossibleFinalPrice() != $p->getFinalPrice()) {
+	            $config['priceFromLabel'] = $this->__('Price From:');
+	        } else {
+	            $config['priceFromLabel'] = $this->__('');
+	        }
+	        $config['ajaxBaseUrl'] = Mage::getUrl('oi/ajax/');
+	        $config['productName'] = $p->getName();
+	        $config['description'] = $this->helper('catalog/output')->productAttribute($p, $p->getDescription(), 'description');
+	        $config['shortDescription'] = $this->helper('catalog/output')->productAttribute($p, nl2br($p->getShortDescription()), 'short_description');
+	
+	        if (Mage::getStoreConfig('SCP_options/product_page/change_image')) {
+	            $config["imageUrl"] = (string)Mage::helper('catalog/image')->init($p, 'image');
+	        }
+	
+	        $childBlock = $this->getLayout()->createBlock('catalog/product_view_attributes');
+	        $config["productAttributes"] = $childBlock->setTemplate('catalog/product/view/attributes.phtml')
+	            ->setProduct($this->getProduct())
+	            ->toHtml();
+	
+	        if (Mage::getStoreConfig('SCP_options/product_page/change_image')) {
+	            if (Mage::getStoreConfig('SCP_options/product_page/change_image_fancy')) {
+	                $childBlock = $this->getLayout()->createBlock('catalog/product_view_media');
+	                $config["imageZoomer"] = $childBlock->setTemplate('catalog/product/view/media.phtml')
+	                    ->setProduct($this->getProduct())
+	                    ->toHtml();
+	            }
+	        }
+	
+	        if (Mage::getStoreConfig('SCP_options/product_page/show_price_ranges_in_options')) {
+	            $config['showPriceRangesInOptions'] = true;
+	            $config['rangeToLabel'] = $this->__('to');
+	        }
+	        
+	        $option_values = Zend_Json::encode($config);
+	        $cache->save($option_values, 'px_scp_configurable_options_'.$this->getProduct()->getId().'_'.$this->getCurrentStore()->getCode(), array("px_cache"), 60*60*24*30);
+		        
+		}
+		
+        return $option_values;
+        //parent getJsonConfig uses the following instead, but it seems to just break inline translate of this json?
+        //return Mage::helper('core')->jsonEncode($config);
+    }
+    
+    
+	/**
+     * Composes configuration for js
+     *
+     * @return string
+     */
+    public function getPixopaJsonConfig()
+    {
+    	$cache = Mage::getSingleton('core/cache');
+		$option_values = $cache->load('px_configurable_options_'.$this->getProduct()->getId().'_'.$this->getCurrentStore()->getCode());
+				
+		if($option_values == false){
+			
+			Mage::log('Configurable Options data not found in cache!!!!');
+			
+	        $attributes = array();
+	        $options    = array();
+	        $store      = $this->getCurrentStore();
+	        $storeId    = $this->getCurrentStore()->getStoreId();
+	        $taxHelper  = Mage::helper('tax');
+	        $currentProduct = $this->getProduct();
+	        $currentProduct = Mage::getModel('catalog/product')->setStoreId($storeId)->load($currentProduct->getId());
+	        
+	        $preconfiguredFlag = $currentProduct->hasPreconfiguredValues();
+	        if ($preconfiguredFlag) {
+	            $preconfiguredValues = $currentProduct->getPreconfiguredValues();
+	            $defaultValues       = array();
+	        }
+	
+	        foreach ($this->getAllowProducts() as $product) {
+	            $productId  = $product->getId();
+	
+	            foreach ($this->getAllowAttributes() as $attribute) {
+	                $productAttribute   = $attribute->getProductAttribute();
+	                $productAttributeId = $productAttribute->getId();
+	                $attributeValue     = $product->getData($productAttribute->getAttributeCode());
+	                if (!isset($options[$productAttributeId])) {
+	                    $options[$productAttributeId] = array();
+	                }
+	
+	                if (!isset($options[$productAttributeId][$attributeValue])) {
+	                    $options[$productAttributeId][$attributeValue] = array();
+	                }
+	                $options[$productAttributeId][$attributeValue][] = $productId;
+	            }
+	        }
+	
+	        $this->_resPrices = array(
+	            $this->_preparePrice($currentProduct->getFinalPrice())
+	        );
+	
+	        foreach ($this->getAllowAttributes() as $attribute) {
+	            $productAttribute = $attribute->getProductAttribute();
+	            $attributeId = $productAttribute->getId();
+	            $info = array(
+	               'id'        => $productAttribute->getId(),
+	               'code'      => $productAttribute->getAttributeCode(),
+	               'label'     => Mage::helper('dol')->filterSizeLabel($attribute->getLabel()),
+	               'options'   => array()
+	            );
+	
+	            $optionPrices = array();
+	            $prices = $attribute->getPrices();
+	            if (is_array($prices)) {
+	                foreach ($prices as $value) {
+	                    if(!$this->_validateAttributeValue($attributeId, $value, $options)) {
+	                        continue;
+	                    }
+	                    $currentProduct->setConfigurablePrice(
+	                        $this->_preparePrice($value['pricing_value'], $value['is_percent'])
+	                    );
+	                    $currentProduct->setParentId(true);
+	                    Mage::dispatchEvent(
+	                        'catalog_product_type_configurable_price',
+	                        array('product' => $currentProduct)
+	                    );
+	                    $configurablePrice = $currentProduct->getConfigurablePrice();
+	
+	                    if (isset($options[$attributeId][$value['value_index']])) {
+	                        $productsIndex = $options[$attributeId][$value['value_index']];
+	                    } else {
+	                        $productsIndex = array();
+	                    }
+	
+	                    $info['options'][] = array(
+	                        'id'        => $value['value_index'],
+	                        'label'     => Mage::helper('dol')->filterSizeLabel($value['label']),
+	                        'price'     => $configurablePrice,
+	                        'oldPrice'  => $this->_prepareOldPrice($value['pricing_value'], $value['is_percent']),
+	                        'products'  => $productsIndex,
+	                    );
+	                    $optionPrices[] = $configurablePrice;
+	                }
+	            }
+	            /**
+	             * Prepare formated values for options choose
+	             */
+	            foreach ($optionPrices as $optionPrice) {
+	                foreach ($optionPrices as $additional) {
+	                    $this->_preparePrice(abs($additional-$optionPrice));
+	                }
+	            }
+	            if($this->_validateAttributeInfo($info)) {
+	               $attributes[$attributeId] = $info;
+	            }
+	
+	            // Add attribute default value (if set)
+	            if ($preconfiguredFlag) {
+	                $configValue = $preconfiguredValues->getData('super_attribute/' . $attributeId);
+	                if ($configValue) {
+	                    $defaultValues[$attributeId] = $configValue;
+	                }
+	            }
+	        }
+	
+	        $taxCalculation = Mage::getSingleton('tax/calculation');
+	        if (!$taxCalculation->getCustomer() && Mage::registry('current_customer')) {
+	            $taxCalculation->setCustomer(Mage::registry('current_customer'));
+	        }
+	
+	        $_request = $taxCalculation->getRateRequest(false, false, false);
+	        $_request->setProductClassId($currentProduct->getTaxClassId());
+	        $defaultTax = $taxCalculation->getRate($_request);
+	
+	        $_request = $taxCalculation->getRateRequest();
+	        $_request->setProductClassId($currentProduct->getTaxClassId());
+	        $currentTax = $taxCalculation->getRate($_request);
+	
+	        $taxConfig = array(
+	            'includeTax'        => $taxHelper->priceIncludesTax(),
+	            'showIncludeTax'    => $taxHelper->displayPriceIncludingTax(),
+	            'showBothPrices'    => $taxHelper->displayBothPrices(),
+	            'defaultTax'        => $defaultTax,
+	            'currentTax'        => $currentTax,
+	            'inclTaxTitle'      => Mage::helper('catalog')->__('Incl. Tax')
+	        );
+	        
+	        $config = array(
+	            'attributes'        => $attributes,
+	            'template'          => str_replace('%s', '#{price}', $store->getCurrentCurrency()->getOutputFormat()),
+	            'basePrice'         => $this->_registerJsPrice($this->_convertPrice($currentProduct->getFinalPrice())),
+	            'oldPrice'          => $this->_registerJsPrice($this->_convertPrice($currentProduct->getPrice())),
+	            'productId'         => $currentProduct->getId(),
+	            'chooseText'        => Mage::helper('catalog')->__('Choose an Option...'),
+	            'taxConfig'         => $taxConfig
+	        );
+	
+	        if ($preconfiguredFlag && !empty($defaultValues)) {
+	            $config['defaultValues'] = $defaultValues;
+	        }
+	
+	        $config = array_merge($config, $this->_getAdditionalConfig());
+	
+	        $option_values = Zend_Json::encode($config);
+	        
+	        $cache->save($option_values, 'px_configurable_options_'.$this->getProduct()->getId().'_'.$this->getCurrentStore()->getCode(), array("px_cache"), 60*60*24*30);
+		}
+        return $option_values;
+    }
+    
+    
+	public function getJsonTemplateConfig($template_id){
+    	
+    	$json_config = Zend_Json::decode($this->getJsonConfig(), true);
+    	
+    	$size_attribute_id = Mage::getStoreConfig('dol/catalog_setting/size_attribute_id');
+    	
+    	$template_attributes = array();
+    	$template_config = array();
+    	
+    	if($template_id){
+    	
+    		$content_list = Mage::getModel('template/content')->getCollection()->addFieldToFilter('template_id', array('eq'=>$template_id))->load();
+					
+			$px_svg_design_id = '';
+			foreach($content_list as $content){
+				
+				$size_id = $content->getData('size_id');
+				$other_attributes = $content->getData('other_attributes');
+				
+				if(!$template_attributes || !in_array($size_id, $template_attributes[$size_attribute_id])){
+					$template_attributes[$size_attribute_id][] = $size_id;
+				}
+				
+				$other_attributes = json_decode($other_attributes, true);
+				
+				if($other_attributes){
+					
+					foreach($other_attributes as $key => $other_attribute){
+						
+						foreach ($other_attribute as $other_attribute_value){
+							if(!array_key_exists($key, $template_attributes) || !in_array($other_attribute_value, $template_attributes[$key])){
+								$template_attributes[$key][] = $other_attribute_value;
+							}
+							$template_config[$size_id][$key][] = $other_attribute_value;
+						}
+					}
+				}
+			}
+    	}
+    	
+    	$config_attributes = $json_config['attributes'];
+    	$filtered_options_data = array();
+    	
+    	if($template_attributes){
+    		
+    		foreach($template_attributes as $key => $template_attribute_values){
+    			
+    			if(!array_key_exists($key, $config_attributes)){
+    				continue;
+    			}
+    			
+    			foreach($template_attribute_values as $template_attribute_value){
+
+    				$key_attributes = $config_attributes[$key];
+	    			$options = $key_attributes['options'];
+	
+	    			foreach($options as $option){
+	    				if($option['id'] == $template_attribute_value){
+	    					
+	    					if($key==$size_attribute_id){
+	    						$label = $option['label'];
+	    						$option['label'] = Mage::helper('dol')->filterSizeLabel($label);
+	    					}
+	    					$filtered_options_data[$key][] = $option;
+	    				}
+	    			}
+    			}
+    		}
+    		
+    		foreach($template_attributes as $key => $template_attribute_values){
+    			
+    			$final_options = array();
+    			
+    			if(!array_key_exists($key, $json_config['attributes'])){
+    				continue;
+    			}
+    			
+    			$options = $json_config['attributes'][$key]['options'];
+    			
+    			foreach($options as $option){
+    				
+    				$option_id = $option['id'];
+    				$filtered_options = $filtered_options_data[$key];
+    				
+    				foreach($filtered_options as $filtered_key => $filtered_option){
+    					
+    					$filtered_option_id = $filtered_option['id'];
+    					
+    					if($option_id==$filtered_option_id){
+    						$final_options[] = $filtered_options_data[$key][$filtered_key];
+    						break;
+    					}
+    				}
+    			}
+    			$json_config['attributes'][$key]['options'] = $final_options;
+    		}
+    	}
+    	
+    	$config = array();
+    	$config['json_config'] = Zend_Json::encode($json_config);
+    	$config['template_config'] = Zend_Json::encode($template_config);
+    	
+    	return $config;
+    }
+    
+    
+}
